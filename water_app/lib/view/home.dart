@@ -3,6 +3,8 @@ import 'dart:developer';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:water_app/view/dashboard.dart';
+
 class Home extends StatelessWidget {
   // This widget is the root of your application.
   @override
@@ -26,8 +28,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
+  final _formKey = GlobalKey<FormState>();
+  var _personNameController = TextEditingController();
   bool _register = false;
   bool _registerData;
+  String _nome;
 
   void initState() {
     super.initState();
@@ -49,6 +54,21 @@ class _HomePageState extends State<HomePage> {
       _registerData = _register == true ? true : false;
       print(_registerData);
       prefs.setBool('cadastrado', cadastrado);
+    });
+  }
+
+  getName() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _nome = prefs.getString('name');
+    });
+  }
+
+  _setName(name) async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _nome = name;
+      prefs.setString('name', name);
     });
   }
 
@@ -99,14 +119,15 @@ class _HomePageState extends State<HomePage> {
               width: 200,
               height: 50,
               child: FloatingActionButton(
-                child: Text(_registerData == true ? 'Bem Vindo!' : 'Começar',
+                child: Text(_registerData == true ? 'Bem Vindo '+'!' : 'Começar',
                   style: TextStyle(color: Colors.black, fontSize: 18),
                 ),
                 backgroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(40),
                 ),
-                onPressed: _cadastrarUsuario,
+                onPressed: _registerData == false ? _cadastrarUsuario : () => Navigator.push(
+                    context, MaterialPageRoute(builder: (context) => Dashboard())),
               ),
             ),
           ],
@@ -116,9 +137,47 @@ class _HomePageState extends State<HomePage> {
   }
 
   _cadastrarUsuario() {
-    _setCadastro(true);
+    print("entrou");
+    _showDialog(context);
+  }
 
-    print(_registerData);
+  _showDialog(context) async {
+    return showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          content: Form(
+            key: _formKey,
+            child: TextFormField(
+              controller: _personNameController,
+              validator: (s) {
+                if(s.isEmpty)
+                  return "Digite seu nome";
+                else
+                  return null;
+              },
+              keyboardType: TextInputType.text,
+              decoration: InputDecoration(labelText: "Digite seu Nome"),
+            ),
+          ),
+          actions: <Widget>[
+            FlatButton(
+              child: Text("Avançar",
+                style: TextStyle(color: Colors.lightBlueAccent,
+                    fontWeight: FontWeight.bold),
+              ),
+              onPressed: () {
+                if(_formKey.currentState.validate())
+                  _setCadastro(true);
+                  _setName(_personNameController.text.toString());
+                  //Dashboard();
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
 }
