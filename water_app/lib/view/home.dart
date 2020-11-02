@@ -1,7 +1,12 @@
 import 'dart:developer';
+import 'dart:ffi';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:water_app/models/User.dart';
+import 'package:water_app/models/Water.dart';
+import 'package:water_app/controllers/user_controller.dart';
+import 'package:water_app/controllers/water_controller.dart';
 
 import 'package:water_app/view/dashboard.dart';
 
@@ -29,21 +34,42 @@ class HomePage extends StatefulWidget {
 
 class _HomePageState extends State<HomePage> {
   final _formKey = GlobalKey<FormState>();
+  var _userController = UserController();
+  var _waterController = WaterController();
+  var _user = List<User>();
+  var _water = List<Water>();
   var _personNameController = TextEditingController();
   bool _register = false;
   bool _registerData;
-  String _nome;
+  var _peso;
+  double _pesoData;
 
   void initState() {
     super.initState();
     _verificaCadastro();
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _userController.getAll().then((data) {
+        setState(() {
+          _user = _userController.list;
+        });
+      });
+    });
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _waterController.getAll().then((data) {
+        setState(() {
+          _water = _waterController.list;
+        });
+      });
+    });
   }
 
   _verificaCadastro() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
       _register = (prefs.getBool('cadastrado') ?? true);
-      _registerData = _register == true ? false : true;
+      _registerData = _register == true ? true : false;
     });
   }
 
@@ -57,19 +83,31 @@ class _HomePageState extends State<HomePage> {
     });
   }
 
-  getName() async {
+  getPeso() async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _nome = prefs.getString('name');
+      _peso = prefs.getDouble('peso') ?? _pesoData;
+      _pesoData = _peso == _pesoData ? _peso : _peso;
     });
   }
 
-  _setName(name) async {
+  _setPeso(peso) async {
     SharedPreferences prefs = await SharedPreferences.getInstance();
     setState(() {
-      _nome = name;
-      prefs.setString('name', name);
+      _peso = peso;
+      prefs.setDouble('peso', peso);
     });
+    print(peso);
+  }
+
+  int _coposRestantes() {
+    int copos = 0;
+    for(int i=0; i < _waterController.list.length; i++ ) {
+      if(_waterController.list[i].Active == false)
+        copos= copos+1;
+    }
+
+    return copos;
   }
 
   @override
@@ -81,6 +119,7 @@ class _HomePageState extends State<HomePage> {
   }
 
   _body() {
+    int copos_restantes = _coposRestantes();
     return Column(
       children: <Widget>[
         Row(
@@ -100,10 +139,15 @@ class _HomePageState extends State<HomePage> {
               Card(
                 margin: EdgeInsets.only(bottom: 40),
                 color: Colors.white,
-                child: Container(
-                  width: 250,
-                  height: 100,
-                  child: Text('Restam 6 copos de agua'),
+                child: Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                  child: Container(
+                    width: 250,
+                    height: 60,
+                    child: Text('Restam '+copos_restantes.toString()+' copos de água!!', style: TextStyle(
+                      fontSize: 20, fontWeight: FontWeight.bold
+                    ),),
+                  ),
                 ),
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
@@ -119,7 +163,7 @@ class _HomePageState extends State<HomePage> {
               width: 200,
               height: 50,
               child: FloatingActionButton(
-                child: Text(_registerData == true ? 'Bem Vindo '+'!' : 'Começar',
+                child: Text(_registerData == true ? 'Bem Vindo !' : 'Começar',
                   style: TextStyle(color: Colors.black, fontSize: 18),
                 ),
                 backgroundColor: Colors.white,
@@ -152,12 +196,12 @@ class _HomePageState extends State<HomePage> {
               controller: _personNameController,
               validator: (s) {
                 if(s.isEmpty)
-                  return "Digite seu nome";
+                  return "Digite seu Peso";
                 else
                   return null;
               },
               keyboardType: TextInputType.text,
-              decoration: InputDecoration(labelText: "Digite seu Nome"),
+              decoration: InputDecoration(labelText: "Digite seu Peso"),
             ),
           ),
           actions: <Widget>[
@@ -169,7 +213,9 @@ class _HomePageState extends State<HomePage> {
               onPressed: () {
                 if(_formKey.currentState.validate())
                   _setCadastro(true);
-                  _setName(_personNameController.text.toString());
+                  _setPeso(_personNameController.text);
+                  _userController.create(User(Peso: double.parse(_personNameController.text)));
+                  _calcularQuantidadeAgua(double.parse(_personNameController.text));
                   //Dashboard();
                 Navigator.of(context).pop();
               },
@@ -178,6 +224,12 @@ class _HomePageState extends State<HomePage> {
         );
       },
     );
+  }
+
+  _calcularQuantidadeAgua(double peso) {
+    double copos = (peso * 35)/200;
+    for(int i = 0; i < copos; i++)
+      _waterController.create(Water(Id: i, Active: false));
   }
 
 }
